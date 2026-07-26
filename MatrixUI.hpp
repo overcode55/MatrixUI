@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -7,16 +8,18 @@
 #include <tuple>
 #include <variant>
 #include <cstdlib>
+#include <filesystem>
 
 
 #ifndef IMPLEMENT_MATRIX_UI 
+
 struct Context{
   std::unordered_map<std::string , std::string> xml_buffers;
   std::unordered_map<std::string , std::string> css_buffers;
   std::unordered_map<std::string , std::string> lua_buffers;
   std::string output_dir;
   std::string output_name;
-} global_Context;
+};
 
 void log(std::string_view str){
   std::cout << str << "\n";
@@ -119,6 +122,34 @@ void figure_what_to_do(const std::string& arg , Context& context){
   }
 }
 
+std::string compile_xml(std::unordered_map<std::string , std::string>& xml_buffers , Context& context){
+}
+
+int transcompile(Context& context){
+  std::filesystem::path output_path = context.output_dir + context.output_name;
+  std::ofstream output(output_path);
+  bool success = false
+  if(!output.is_open()){
+    try {
+      if (fs::create_directory(context.output_dir)) {
+          success = true;
+      } else {
+          log_err("Folder already exists or could not be created");
+      }
+    } catch (const fs::filesystem_error& e) {
+        log_err(std::string("Filesystem error: ") + std::string(e.what()));
+    }
+    if(!success) return -1;
+    else output.open(output_path);
+  }
+  if(!output.is_open()){
+    log_err("output directory is wrong or other errors took place while trying to create directory!"); 
+    return -1;
+  }else{
+    std::string compiled_xml = compile_xml(context.xml_buffers , context);
+  }
+}
+
 int compile(const std::vector<std::string>& argv)
 {
 
@@ -133,22 +164,11 @@ int compile(const std::vector<std::string>& argv)
     figure_what_to_do(arg , context);
   } 
 
-    for (const auto& [file_name, buffer] : context.xml_buffers) {
-      std::cout << "Filename: " << file_name << "\n";
-      std::cout << "Buffer Content: " << buffer << "\n\n";
-    }
-    for (const auto& [file_name, buffer] : context.lua_buffers) {
-      std::cout << "Filename: " << file_name << "\n";
-      std::cout << "Buffer Content: " << buffer << "\n\n";
-    }
-    for (const auto& [file_name, buffer] : context.css_buffers) {
-      std::cout << "Filename: " << file_name << "\n";
-      std::cout << "Buffer Content: " << buffer << "\n\n";
-    }
+  if(constext.xml_buffer.empty()){
+    log_err("at least one xml file must be compiled!");
+    return -1;
+  }
 
-    log(context.output_dir);
-    log(context.output_name);
-
-  return 0;
+  return transcompile(context);;
 }
 #endif
