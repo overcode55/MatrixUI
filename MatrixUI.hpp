@@ -1,0 +1,154 @@
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <map>
+#include <iostream>
+#include <fstream>
+#include <tuple>
+#include <variant>
+#include <cstdlib>
+
+
+#ifndef IMPLEMENT_MATRIX_UI 
+struct Context{
+  std::unordered_map<std::string , std::string> xml_buffers;
+  std::unordered_map<std::string , std::string> css_buffers;
+  std::unordered_map<std::string , std::string> lua_buffers;
+  std::string output_dir;
+  std::string output_name;
+} global_Context;
+
+void log(std::string_view str){
+  std::cout << str << "\n";
+}
+void log_err(std::string_view str){
+  std::cerr << "\033[38;2;255;90;90m" << str << "\033[0m" << "\n";
+}
+
+constexpr unsigned int hash_string(std::string_view str) {
+    unsigned int hash = 2166136261u;
+    for (char c : str) {
+        hash ^= static_cast<unsigned int>(c);
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+void read_into_buffer(const std::string& path , std::string& buffer){
+  std::ifstream file(path , std::ios::binary | std::ios::ate);
+  if(!file.is_open()){
+    log_err("couldn't open file");
+    return;
+  }
+
+  std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  buffer.resize(size);
+  if (!file.read(buffer.data(), size)) {
+    log_err(std::string("couldn't read file: ") + path);   
+  }
+}
+
+std::vector<std::string> separate_files(std::string value){
+  auto pos = value.find_first_of('*');
+  std::vector<std::string> files{};
+  while(pos != std::string::npos){
+    std::string file = value.substr(0 , pos);
+    files.push_back(file);
+    value = value.substr(pos + 1 , value.size());
+  }
+  if (!value.empty()) {
+    files.push_back(value);
+  }
+  return files;
+}
+
+void read_file(const std::string& file , Context& context){
+  auto file_type_dot_pos = file.find_last_of('.');
+  if(file_type_dot_pos == std::string::npos){
+    log_err(std::string("expected file type for: ") + file);
+    return;
+  }
+  std::string file_type = file.substr(file_type_dot_pos , file.size());
+       if(file_type == ".lua") read_into_buffer(file , context.lua_buffers[file]);
+  else if(file_type == ".css") read_into_buffer(file , context.css_buffers[file]);
+  else if(file_type == ".xml") read_into_buffer(file , context.xml_buffers[file]);
+  else {
+    log_err(std::string("unsuported file type: ") + file_type + std::string(" , from file: ") + file);
+    exit(-1);
+  }
+}
+
+enum class Argument_Types{
+  OUTDIR,
+  OUTNAME,
+  FILE,
+  UNKNOW
+};
+
+std::pair<Argument_Types , std::string> arg_type(const std::string& arg){
+  auto argtype_end_pos = arg.find_first_of("=");
+
+  if(argtype_end_pos == std::string::npos) return std::pair<Argument_Types , std::string>{Argument_Types::FILE , arg};
+
+  auto argtype = arg.substr(0 , argtype_end_pos);
+  std::string argvalue = arg.substr(argtype_end_pos + 1 , arg.size());
+  if(argtype == "-outdir") return std::pair<Argument_Types , std::string>{Argument_Types::OUTDIR , argvalue};
+  if(argtype == "-outname") return std::pair<Argument_Types , std::string>{Argument_Types::OUTNAME , argvalue};
+  return std::pair<Argument_Types , std::string>{Argument_Types::UNKNOW , argvalue};
+}
+
+void figure_what_to_do(const std::string& arg , Context& context){
+  auto [type , value] = arg_type(arg);
+
+  switch (type)
+  {
+  case Argument_Types::OUTDIR:
+    context.output_dir = value;
+    break;
+  case Argument_Types::OUTNAME:
+    context.output_name = value;
+    break;
+  case Argument_Types::FILE:
+    read_file(arg , context);
+    break;
+  default:
+    log_err(std::string("unknow argument: ") + arg);
+    break;
+  }
+}
+
+int compile(const std::vector<std::string>& argv)
+{
+
+  if(argv.empty()){
+    std::cerr << "expected argument(s)!\n";
+    return -1;
+  }
+
+  Context context;
+
+  for(auto arg : argv){
+    figure_what_to_do(arg , context);
+  } 
+
+    for (const auto& [file_name, buffer] : context.xml_buffers) {
+      std::cout << "Filename: " << file_name << "\n";
+      std::cout << "Buffer Content: " << buffer << "\n\n";
+    }
+    for (const auto& [file_name, buffer] : context.lua_buffers) {
+      std::cout << "Filename: " << file_name << "\n";
+      std::cout << "Buffer Content: " << buffer << "\n\n";
+    }
+    for (const auto& [file_name, buffer] : context.css_buffers) {
+      std::cout << "Filename: " << file_name << "\n";
+      std::cout << "Buffer Content: " << buffer << "\n\n";
+    }
+
+    log(context.output_dir);
+    log(context.output_name);
+
+  return 0;
+}
+#endif
