@@ -67,6 +67,15 @@ std::vector<std::string> separate_files(std::string value){
   return files;
 }
 
+std::string get_file_type(std::string& file){
+  auto file_type_dot_pos = file.find_last_of('.');
+  if(file_type_dot_pos == std::string::npos){
+    log_err(std::string("expected file type for: ") + file);
+    return "";
+  }
+  return file.substr(file_type_dot_pos , file.size());
+}
+
 void read_file(const std::string& file , Context& context){
   auto file_type_dot_pos = file.find_last_of('.');
   if(file_type_dot_pos == std::string::npos){
@@ -122,21 +131,107 @@ void figure_what_to_do(const std::string& arg , Context& context){
   }
 }
 
-std::string compile_xml(std::unordered_map<std::string , std::string>& xml_buffers , Context& context){
+enum class XML_Basic_Token_Type{
+  
+}
+enum class CSS_Basic_Token_Type{
+  
+}
+
+
+struct Basic_Token{
+  union Basic_Token_Type{
+    XML_Basic_Token_Type xml_type;
+    CSS_Basic_Token_Type css_type;
+  }
+  std::string raw_value;
+  size_t line,column;
+  std::string file;
+};
+
+int utf8_decode(std::string& buffer , int& pos){
+  unsigned char c = buffer[pos++];
+
+  // 1-byte ASCII (0xxxxxxx)
+  if ((c & 0x80) == 0) {
+      return c;
+  }
+  
+  // 2-byte sequence (110xxxxx)
+  if ((c & 0xE0) == 0xC0) {
+      int code = c & 0x1F;
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      return code;
+  }
+  
+  // 3-byte sequence (1110xxxx)
+  if ((c & 0xF0) == 0xE0) {
+      int code = c & 0x0F;
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      return code;
+  }
+  
+  // 4-byte sequence (11110xxx)
+  if ((c & 0xF8) == 0xF0) {
+      int code = c & 0x07;
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+      return code;
+  }
+  
+  return -1; // Invalid UTF-8 leading byte
+}
+
+std::vector<Basic_Token> unpack_buffer(std::string& buffer , std::string file){
+  int c = 1;
+  int pos = 0;
+  auto next = [&](bool expect_eof = true){
+    if(pos >= buffer.size()){
+      if(!expect_eof){
+        log_err(std::string("unexpected end of file, in file:") + file);
+      }else{
+        return false;
+      }
+    }else{
+      c = utf8_decode(buffer , pos);
+    }
+  };
+
+  std::vector<Basic_Token> BTs{};
+
+  auto push = [&]()
+
+  while(next()){
+
+  }
+}
+
+void get_basic_tokens(std::unordered_map<std::string , std::string>& buffers , std::unordered_map<std::string , std::vector<Basic_Token>>& Basic_Tokens){
+  for(auto& [file , buffer] : buffers){
+    Basic_Tokens[file] = unpack_buffer(buffer , file);
+  }
+}
+
+std::string compile_xml(std::unordered_map<std::string , std::string>& xml_buffers , Context& context , std::ofstream& output){
+  std::unordered_map<std::string , std::vector<Basic_Token>> Basic_Tokens;
+  get_basic_tokens(xml_buffers , Basic_Tokens);
+  
 }
 
 int transcompile(Context& context){
   std::filesystem::path output_path = context.output_dir + context.output_name;
   std::ofstream output(output_path);
-  bool success = false
+  bool success = false;
   if(!output.is_open()){
     try {
-      if (fs::create_directory(context.output_dir)) {
+      if (std::filesystem::create_directory(context.output_dir)) {
           success = true;
       } else {
           log_err("Folder already exists or could not be created");
       }
-    } catch (const fs::filesystem_error& e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         log_err(std::string("Filesystem error: ") + std::string(e.what()));
     }
     if(!success) return -1;
@@ -146,12 +241,11 @@ int transcompile(Context& context){
     log_err("output directory is wrong or other errors took place while trying to create directory!"); 
     return -1;
   }else{
-    std::string compiled_xml = compile_xml(context.xml_buffers , context);
+    std::string compiled_xml = compile_xml(context.xml_buffers , context , output);
   }
 }
 
-int compile(const std::vector<std::string>& argv)
-{
+int compile(const std::vector<std::string>& argv){
 
   if(argv.empty()){
     std::cerr << "expected argument(s)!\n";
@@ -164,7 +258,7 @@ int compile(const std::vector<std::string>& argv)
     figure_what_to_do(arg , context);
   } 
 
-  if(constext.xml_buffer.empty()){
+  if(context.xml_buffers.empty()){
     log_err("at least one xml file must be compiled!");
     return -1;
   }
