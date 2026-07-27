@@ -77,12 +77,7 @@ std::string get_file_type(std::string& file){
 }
 
 void read_file(const std::string& file , Context& context){
-  auto file_type_dot_pos = file.find_last_of('.');
-  if(file_type_dot_pos == std::string::npos){
-    log_err(std::string("expected file type for: ") + file);
-    return;
-  }
-  std::string file_type = file.substr(file_type_dot_pos , file.size());
+  std::string file_type = get_file_type(file);
        if(file_type == ".lua") read_into_buffer(file , context.lua_buffers[file]);
   else if(file_type == ".css") read_into_buffer(file , context.css_buffers[file]);
   else if(file_type == ".xml") read_into_buffer(file , context.xml_buffers[file]);
