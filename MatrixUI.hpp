@@ -127,18 +127,53 @@ void figure_what_to_do(const std::string& arg , Context& context){
 }
 
 enum class XML_Basic_Token_Type{
-  
+  BRAKET_OPEN,
+  BRAKET_CLOSE,
+  EOF,
+  PROPERTY,
+  PROPERTY_VALUE,
+  EQUAL,
+  TAG,
+  BRAKET_OPEN_SLASH,
+  BRAKET_CLOSE_SLASH,
+  STRING
 }
 enum class CSS_Basic_Token_Type{
-  
+  ANDPERCENT,
+  BRAKET_OPEN,
+  BRAKET_CLOSE,
+  FUNCTION_NAME,
+  FUNCTION_VALUE,
+  DOUBLE_COLON,
+  COLON,
+  TAG,
+  CLASS,
+  ID,
+  UNIVERSAL,
+  CHILD_SELECTOR,
+  ADJACENT_SELECTOR,
+  GENERAL_SIBLING_SELECTOR,
+  ATRIBUTE_SLECTOR,
+  ATRIBUTE_SLECTOR_VALUE,
+  ATRIBUTE_EXISTS,
+  ATRIBUTE_STARTS_WITH,
+  ATRIBUTE_STARTS_WITH_VALUE,
+  ATRIBUTE_ENDS_WITH,
+  ATRIBUTE_ENDS_WITH_VALUE,
+  ATRIBUTE_CONTAINS_WITH,
+  ATRIBUTE_CONTAINS_WITH_VALUE,
+  MATH,
+  EOF
 }
 
 
+union Basic_Token_Type{
+  XML_Basic_Token_Type xml_type;
+  CSS_Basic_Token_Type css_type;
+};
+
 struct Basic_Token{
-  union Basic_Token_Type{
-    XML_Basic_Token_Type xml_type;
-    CSS_Basic_Token_Type css_type;
-  }
+  Basic_Token_Type type;
   std::string raw_value;
   size_t line,column;
   std::string file;
@@ -192,11 +227,21 @@ std::vector<Basic_Token> unpack_buffer(std::string& buffer , std::string file){
     }else{
       c = utf8_decode(buffer , pos);
     }
+    return true;
   };
 
   std::vector<Basic_Token> BTs{};
 
-  auto push = [&]()
+  auto push = [&](Basic_Token_Type type , std::string& raw_value , size_t line , size_t column , std::string& file){
+    Basic_Token token{
+      .type = type,
+      .raw_value = raw_value,
+      .line = line,
+      .column = column,
+      .file = file
+    };
+    BTs.push_back(token);
+  };
 
   while(next()){
 
