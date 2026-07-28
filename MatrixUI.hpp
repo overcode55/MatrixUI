@@ -179,44 +179,51 @@ struct Basic_Token{
   std::string file;
 };
 
-int utf8_decode(std::string& buffer , int& pos){
+int utf8_decode(std::string& buffer , int& pos , bool peeking = false){
   unsigned char c = buffer[pos++];
+  if(peeking) pos--;
 
   // 1-byte ASCII (0xxxxxxx)
   if ((c & 0x80) == 0) {
-      return c;
+    return c;
   }
   
   // 2-byte sequence (110xxxxx)
   if ((c & 0xE0) == 0xC0) {
-      int code = c & 0x1F;
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      return code;
+    int code = c & 0x1F;
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    if(peeking) pos--;
+    return code;
   }
   
   // 3-byte sequence (1110xxxx)
   if ((c & 0xF0) == 0xE0) {
-      int code = c & 0x0F;
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      return code;
+    int code = c & 0x0F;
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    if(peeking) pos-=2;
+    return code;
   }
   
   // 4-byte sequence (11110xxx)
   if ((c & 0xF8) == 0xF0) {
-      int code = c & 0x07;
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
-      return code;
+    int code = c & 0x07;
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    code = (code << 6) | (static_cast<unsigned char>(buffer[pos++]) & 0x3F);
+    if(peeking) pos-=3;
+    return code;
   }
   
+  if(peeking) pos--;
+
   return -1; // Invalid UTF-8 leading byte
 }
 
 std::vector<Basic_Token> unpack_buffer(std::string& buffer , std::string file){
   int c = 1;
   int pos = 0;
+  size_t line , column = 0;
   auto next = [&](bool expect_eof = true){
     if(pos >= buffer.size()){
       if(!expect_eof){
@@ -226,13 +233,32 @@ std::vector<Basic_Token> unpack_buffer(std::string& buffer , std::string file){
       }
     }else{
       c = utf8_decode(buffer , pos);
+      if(c == '\n'){
+        line++;
+        column = 0;
+      }else{
+        column++;
+      }
+    }
+    return true;
+  };
+  auto peek = [&](){
+        if(pos >= buffer.size()){
+      if(!expect_eof){
+        log_err(std::string("unexpected end of file, in file:") + file);
+      }else{
+        return false;
+      }
+    }else{
+      c = utf8_decode(buffer , pos , true);
+      }
     }
     return true;
   };
 
   std::vector<Basic_Token> BTs{};
 
-  auto push = [&](Basic_Token_Type type , std::string& raw_value , size_t line , size_t column , std::string& file){
+  auto push = [&](Basic_Token_Type type , std::string& raw_value){
     Basic_Token token{
       .type = type,
       .raw_value = raw_value,
@@ -242,8 +268,21 @@ std::vector<Basic_Token> unpack_buffer(std::string& buffer , std::string file){
     };
     BTs.push_back(token);
   };
-
-  while(next()){
+  std::string file_type = get_file_type(file);
+  if(file_type == ".xml"){
+    while(next()){
+      if(c == '<'){
+        push(XML_Basic_Token_Type::BRAKET_OPEN , "");
+      }
+      else if(c == '>')
+    } 
+  }
+  else if(file_type == ".css"){ 
+    while(next()){
+      if()
+    }
+  }
+  else if(file_type == ".lua"){
 
   }
 }
